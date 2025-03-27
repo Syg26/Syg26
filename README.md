@@ -1,4 +1,4 @@
-To Run nodejs App
+Below are the command to Run nodejs App:
 
 sudo apt install nodejs
 
