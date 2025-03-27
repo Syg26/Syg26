@@ -8,4 +8,4 @@ npm install
 
 node app.js
 
-Trigger = 1
+Trigger = 2
