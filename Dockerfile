@@ -10,5 +10,8 @@ COPY HelloWorld.java .
 # Compile the Java program
 RUN javac HelloWorld.java
 
+# Expose port 8001 so that the container can accept connections on that port
+EXPOSE 8001
+
 # Run the Java program
 CMD ["java", "HelloWorld"]
