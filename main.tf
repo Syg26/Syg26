@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-east-1"  # Free tier is available in most regions, this is safe
+  region = "ap-south-1"  # Free tier is available in most regions, this is safe
 }
 
 resource "aws_instance" "free_tier_ec2" {
