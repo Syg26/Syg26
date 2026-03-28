@@ -1,64 +1,43 @@
 import os
+from openai import OpenAI
 
-import openai
-
-
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
+# Initialize client with API key
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def review_code(diff):
+    prompt = f"""
+You are a senior DevOps engineer.
 
-   prompt = f"""
+Review the following code diff and:
+- Identify bugs
+- Suggest improvements
+- Highlight security risks
 
-   You are a senior DevOps engineer.
+Code:
+{diff}
+"""
 
-   Review the following code diff and:
+    # Use new SDK interface
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert DevOps reviewer"},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.3
+    )
 
-   - Identify bugs
-
-   - Suggest improvements
-
-   - Highlight security risks
-
-
-   Code:
-
-   {diff}
-
-   """
-
-
-   response = openai.ChatCompletion.create(
-
-       model="gpt-4o-mini",
-
-       messages=[
-
-           {"role": "system", "content": "You are an expert DevOps reviewer"},
-
-           {"role": "user", "content": prompt}
-
-       ],
-
-       temperature=0.3
-
-   )
-
-
-   return response['choices'][0]['message']['content']
-
-
+    # Extract AI response text
+    return response.choices[0].message.content
 
 if __name__ == "__main__":
+    # Read code diff from file
+    with open("diff.txt", "r") as f:
+        diff = f.read()
 
-   with open("diff.txt", "r") as f:
+    # Get AI review
+    review = review_code(diff)
 
-       diff = f.read()
-
-
-   review = review_code(diff)
-
-
-   with open("review.txt", "w") as f:
-
-       f.write(review)
+    # Save review to file
+    with open("review.txt", "w") as f:
+        f.write(review)
