@@ -78,19 +78,9 @@ jobs:
             const aiReview = fs.readFileSync('review.txt', 'utf8');
             const tfPlan = fs.readFileSync('tfplan.txt', 'utf8');
 
-            const body = `
-## 🤖 AI Code Review
-
-${aiReview}
-
----
-
-## 📄 Terraform Plan Preview
-
-\`\`\`
-${tfPlan}
-\`\`\`
-`;
+            const body = "## 🤖 AI Code Review\n\n" + aiReview +
+                   "\n\n---\n\n## 📄 Terraform Plan Preview\n\n```\n" +
+                   tfPlan + "\n```";
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
