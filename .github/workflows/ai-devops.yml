@@ -1,0 +1,121 @@
+name: Terraform + AI DevOps
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-and-plan:
+    name: AI Review + Terraform Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -----------------------
+      # AI Code Review
+      # -----------------------
+      - name: Get PR diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }} > diff.txt
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install openai
+
+      - name: Run AI review
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python scripts/ai_review.py
+          if grep -q "CRITICAL" review.txt; then
+            echo "CRITICAL issue found! Failing workflow."
+            exit 1
+          fi
+
+      # -----------------------
+      # Terraform Plan
+      # -----------------------
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Save Terraform plan output
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      # -----------------------
+      # Post PR Comments
+      # -----------------------
+      - name: Post AI + Terraform plan to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const aiReview = fs.readFileSync('review.txt', 'utf8');
+            const tfPlan = fs.readFileSync('tfplan.txt', 'utf8');
+
+            const body = `
+## 🤖 AI Code Review
+
+${aiReview}
+
+---
+
+## 📄 Terraform Plan Preview
+
+\`\`\`
+${tfPlan}
+\`\`\`
+`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: ai-and-plan   # Runs only after AI review + plan succeed
+    if: github.event_name == 'workflow_dispatch'   # Manual approval to apply
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
