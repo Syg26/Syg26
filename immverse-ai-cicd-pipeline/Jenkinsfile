@@ -1,0 +1,75 @@
+pipeline {
+    agent any
+    
+    environment {
+        IMAGE_NAME = "suyogshinde26/immverse-ai-cicd-pipeline"
+        CONTAINER_NAME = "immverse-ai-app"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir('immverse-ai-cicd-pipeline') {
+                    sh 'docker build -t $IMAGE_NAME:latest .'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('immverse-ai-cicd-pipeline') {
+                    sh 'echo "Running basic test..."'
+                    sh 'test -f app.js'
+                    sh 'test -f package.json'
+                    sh 'echo "Test Passed"'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh """
+                    echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+                    docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh """
+                docker stop ${CONTAINER_NAME} || true
+                docker rm ${CONTAINER_NAME} || true
+                docker pull ${IMAGE_NAME}:latest
+                docker run -d \
+                  --name ${CONTAINER_NAME} \
+                  -p 80:3000 \
+                  ${IMAGE_NAME}:latest
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Application deployed successfully'
+        }
+        failure {
+            echo 'Pipeline failed'
+        }
+    }
+}
